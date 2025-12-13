@@ -1,0 +1,11 @@
+streamlit>=1.31.0
+langgraph>=0.2.0
+langchain>=0.1.0
+langchain-core>=0.1.0
+transformers>=4.30.0
+torch>=2.0.0
+kss>=5.0.0
+openai>=1.0.0
+tavily-python>=0.3.0
+pandas>=2.0.0
+typing-extensions>=4.5.0

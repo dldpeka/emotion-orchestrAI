@@ -530,22 +530,63 @@ def main():
     # 입력 영역
     st.header("📝 대화 입력")
     
-    # 샘플 데이터
-    sample_text = """2024년 12월 11일 오후 2:30, 김철수 : 오늘 정말 힘든 하루였어
+    # 입력 방식 선택
+    input_method = st.radio(
+        "입력 방식 선택",
+        ["📁 파일 업로드", "✍️ 직접 입력"],
+        horizontal=True
+    )
+    
+    input_text = ""
+    
+    if input_method == "📁 파일 업로드":
+        st.info("💡 카카오톡 → 대화방 → 설정(≡) → '대화 내보내기' → TXT 파일 저장")
+        
+        uploaded_file = st.file_uploader(
+            "카카오톡 대화 내보내기 파일 (.txt)",
+            type=['txt'],
+            help="카카오톡에서 내보낸 텍스트 파일을 업로드하세요"
+        )
+        
+        if uploaded_file is not None:
+            # 파일 읽기 (인코딩 처리)
+            try:
+                input_text = uploaded_file.read().decode('utf-8')
+                st.success(f"✅ 파일 로드 완료: {uploaded_file.name}")
+                
+                # 미리보기
+                with st.expander("📄 파일 내용 미리보기 (처음 10줄)"):
+                    preview_lines = input_text.split('\n')[:10]
+                    st.text('\n'.join(preview_lines))
+                    if len(input_text.split('\n')) > 10:
+                        st.caption(f"... 외 {len(input_text.split('\n')) - 10}줄")
+            except UnicodeDecodeError:
+                try:
+                    uploaded_file.seek(0)
+                    input_text = uploaded_file.read().decode('cp949')
+                    st.success(f"✅ 파일 로드 완료: {uploaded_file.name} (CP949 인코딩)")
+                except:
+                    st.error("❌ 파일 인코딩 오류. UTF-8 또는 ANSI 형식의 파일을 사용해주세요.")
+    
+    else:  # 직접 입력
+        # 샘플 데이터
+        sample_text = """2024년 12월 11일 오후 2:30, 김철수 : 오늘 정말 힘든 하루였어
 2024년 12월 11일 오후 2:31, 이영희 : 무슨 일 있었어?
 2024년 12월 11일 오후 2:32, 김철수 : 회사에서 일이 너무 많아서 스트레스 받아
 2024년 12월 11일 오후 2:33, 이영희 : 힘들겠다 ㅠㅠ 너무 걱정되네
 2024년 12월 11일 오후 2:35, 김철수 : 불안하고 우울해... 어떻게 해야 할지 모르겠어"""
-    
-    if st.button("📋 샘플 데이터 사용"):
-        st.session_state.input_text = sample_text
-    
-    input_text = st.text_area(
-        "카카오톡 대화 또는 일반 텍스트를 입력하세요",
-        value=st.session_state.get('input_text', ''),
-        height=200,
-        help="카카오톡 형식: YYYY년 MM월 DD일 시간, 이름 : 메시지"
-    )
+        
+        col1, col2 = st.columns([3, 1])
+        with col2:
+            if st.button("📋 샘플 데이터", use_container_width=True):
+                st.session_state.input_text = sample_text
+        
+        input_text = st.text_area(
+            "카카오톡 대화 또는 일반 텍스트를 입력하세요",
+            value=st.session_state.get('input_text', ''),
+            height=250,
+            help="카카오톡 형식: YYYY년 MM월 DD일 시간, 이름 : 메시지"
+        )
     
     # 분석 실행
     if st.button("🚀 분석 시작", type="primary", use_container_width=True):
@@ -669,4 +710,4 @@ def main():
                         st.warning("추천 콘텐츠가 없습니다. Tavily API 키를 확인해주세요.")
 
 if __name__ == "__main__":
-    main()          
+    main()

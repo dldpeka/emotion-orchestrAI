@@ -826,12 +826,28 @@ Aggregator 📊
             
             st.subheader("🔑 추출된 핵심 키워드")
             if keywords:
-                # 키워드를 태그처럼 표시
-                keyword_html = " ".join([f"<span style='background-color: #e3f2fd; padding: 5px 10px; margin: 5px; border-radius: 15px; display: inline-block;'>#{kw}</span>" for kw in keywords[:10]])
-                st.markdown(keyword_html, unsafe_allow_html=True)
+                ols = st.columns(3)
+                for idx, kw in enumerate(keywords[:10]):
+                    col_idx = idx % 3
+                    with cols[col_idx]:
+                        st.markdown(f"""
+                        <div style='
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            color: white;
+                            padding: 12px 20px;
+                            margin: 8px 0;
+                            border-radius: 20px;
+                            text-align: center;
+                            font-weight: bold;
+                            font-size: 16px;
+                            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                        '>
+                            #{kw}
+                        </div>
+                        """, unsafe_allow_html=True)
             else:
                 st.info("키워드가 추출되지 않았습니다.")
-            
+                
             st.divider()
             
             content_query = result.get("content_query", "")

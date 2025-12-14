@@ -347,40 +347,126 @@ def summary_agent(state: AppState) -> AppState:
     
     return state
 
+@st.cache_resource
+def load_keybert_model():
+    """KeyBERT 모델 로딩 - 한국어 BERT 사용"""
+    try:
+        from keybert import KeyBERT
+        # 한국어 BERT 모델 사용
+        kw_model = KeyBERT(model='sentence-transformers/xlm-r-100langs-bert-base-nli-stsb-mean-tokens')
+        return kw_model
+    except Exception as e:
+        st.warning(f"⚠️ KeyBERT 로딩 실패: {e}")
+        return None
+
 def keyword_extractor_agent(state: AppState) -> AppState:
-    """키워드 추출 에이전트 (병렬 실행 3)"""
+    """키워드 추출 에이전트 (병렬 실행 3) - 개선 버전"""
     messages = state.get("messages", [])
     emotion_summary = state.get("emotion_summary", {})
     
     # 모든 메시지 텍스트 결합
     all_text = " ".join([msg.get("text", "") for msg in messages])
     
-    # 간단한 키워드 추출
-    words = re.findall(r'\b\w{2,}\b', all_text)
-    word_counts = Counter(words)
+    # 확장된 불용어 사전
+    stopwords = {
+        # 대명사/지시어
+        '이', '그', '저', '것', '나', '너', '우리', '저희', '자기', '여기', '거기', '저기',
+        '이거', '그거', '저거', '뭐', '어디', '누구', '언제', '어떻게', '왜',
+        # 조사/어미
+        '은', '는', '이', '가', '을', '를', '의', '에', '에서', '로', '으로', '와', '과', 
+        '도', '만', '라도', '부터', '까지', '보다', '처럼', '같이', '마저', '조차',
+        # 동사/형용사 어간
+        '하다', '되다', '있다', '없다', '이다', '아니다', '같다', '보다', '주다', '받다',
+        # 부사/접속사
+        '매우', '너무', '아주', '정말', '진짜', '완전', '엄청', '되게', '좀', '더', '덜',
+        '그래서', '그러나', '그런데', '하지만', '또', '또한', '역시', '과연', 
+        # 감탄사
+        '네', '예', '응', '어', '음', '에', '아', '오', '우',
+        # 기타 고빈도 무의미어
+        '거', '것', '게', '때', '수', '등', '들', '안', '않', '못', '말', '데', '분',
+        '점', '번', '채', '편', '쪽', '개', '명', '살', '원', '시', '일', '월', '년'
+    }
     
-    # 불용어 제거
-    stopwords = ['이', '그', '저', '것', '수', '등', '들', '안', '않', '네', '예', '때', '거', '나', '너', '우리', '있', '없', '하']
-    filtered_words = {word: count for word, count in word_counts.items() if word not in stopwords}
+    try:
+        # 방법 1: KoNLPy Okt 사용 (더 정확)
+        if use_konlpy:
+            try:
+                from konlpy.tag import Okt
+                okt = Okt()
+                
+                # 명사만 추출 (가장 의미있는 단어)
+                nouns = okt.nouns(all_text)
+                
+                # 2글자 이상 명사만 필터링
+                nouns = [n for n in nouns if len(n) >= 2]
+                
+                # 불용어 제거 및 카운팅
+                word_counts = Counter([n for n in nouns if n not in stopwords])
+                
+                # 감정 관련 키워드 추가 점수 (감정과 연결)
+                emotion_keywords = {
+                    '힘들다': 3, '피곤': 3, '스트레스': 3, '걱정': 3, '불안': 3,
+                    '좋다': 2, '행복': 2, '기쁨': 2, '사랑': 2, '감사': 2,
+                    '화': 2, '짜증': 2, '답답': 2, '슬프다': 2, '우울': 2
+                }
+                
+                # 감정 키워드에 가중치 부여
+                for keyword, bonus in emotion_keywords.items():
+                    if keyword in word_counts:
+                        word_counts[keyword] += bonus
+                
+            except ImportError:
+                st.warning("⚠️ KoNLPy가 설치되지 않아 기본 방법을 사용합니다.")
+                use_konlpy = False
+        
+        # 방법 2: 정규식 기반 (KoNLPy 없을 때)
+        if not use_konlpy:
+            # 한글만 추출 (2-10자 길이)
+            words = re.findall(r'[가-힣]{2,10}', all_text)
+            word_counts = Counter([w for w in words if w not in stopwords])
     
-    # 상위 10개 키워드
-    top_keywords = sorted(filtered_words.items(), key=lambda x: x[1], reverse=True)[:10]
-    extracted_keywords = [word for word, _ in top_keywords]
+    except Exception as e:
+        st.warning(f"키워드 추출 중 오류: {e}")
+        words = re.findall(r'[가-힣]{2,10}', all_text)
+        word_counts = Counter([w for w in words if w not in stopwords])
     
-    # 감정 기반 검색 쿼리 생성
+    # 상위 15개 키워드 (더 많이)
+    top_keywords = sorted(word_counts.items(), key=lambda x: x[1], reverse=True)[:15]
+    extracted_keywords = [word for word, count in top_keywords]
+    
+    # 감정별 상세 검색 쿼리 생성
     dominant = emotion_summary.get("dominant_label", "중립")
     dominant_lower = dominant.lower()
     
-    if any(word in dominant_lower for word in ["슬픔", "우울", "sad", "부정"]):
-        content_query = "우울 슬픔 감정 관리 심리 상담"
-    elif any(word in dominant_lower for word in ["불안", "걱정", "anxious"]):
-        content_query = "불안 걱정 스트레스 해소 마음챙김"
-    elif any(word in dominant_lower for word in ["분노", "화", "angry"]):
-        content_query = "분노 조절 갈등 해결 의사소통"
-    elif any(word in dominant_lower for word in ["기쁨", "행복", "긍정", "positive", "happy"]):
-        content_query = "행복 긍정 감정 유지 관계 개선"
-    else:
-        content_query = "감정 관리 심리 건강 자기계발"
+    # 추출된 키워드 상위 3개를 쿼리에 포함
+    top_3_keywords = ' '.join(extracted_keywords[:3]) if extracted_keywords else ""
+    
+    # 감정별 맞춤 쿼리
+    query_templates = {
+        "슬픔": f"우울 슬픔 극복 심리 상담 치유 {top_3_keywords}",
+        "우울": f"우울증 극복 마음 치유 심리 건강 {top_3_keywords}",
+        "불안": f"불안 해소 스트레스 관리 마음챙김 명상 {top_3_keywords}",
+        "걱정": f"걱정 해소 심리 안정 멘탈 케어 {top_3_keywords}",
+        "분노": f"분노 조절 화 다스리기 감정 관리 {top_3_keywords}",
+        "화": f"화 조절 갈등 해결 소통 방법 {top_3_keywords}",
+        "기쁨": f"행복 유지 긍정 에너지 관계 개선 {top_3_keywords}",
+        "행복": f"행복한 삶 긍정 마인드 자기 계발 {top_3_keywords}",
+        "사랑": f"관계 유지 사랑 키우기 소통 방법 {top_3_keywords}",
+        "놀람": f"감정 안정 심리 회복 마음 챙김 {top_3_keywords}",
+        "혐오": f"부정 감정 극복 마음 정리 심리 상담 {top_3_keywords}",
+        "공포": f"불안 극복 두려움 해소 심리 치료 {top_3_keywords}"
+    }
+    
+    # 매칭되는 쿼리 찾기
+    content_query = None
+    for emotion_key, query in query_templates.items():
+        if emotion_key in dominant_lower:
+            content_query = query
+            break
+    
+    # 매칭 안되면 기본 쿼리
+    if not content_query:
+        content_query = f"감정 관리 심리 건강 멘탈 케어 {top_3_keywords}"
     
     state["extracted_keywords"] = extracted_keywords
     state["content_query"] = content_query

@@ -260,11 +260,12 @@ def insight_agent(state: AppState, openai_client) -> AppState:
 👥 화자별 분석:
 {json.dumps(speaker_analysis, ensure_ascii=False, indent=2)}
 
-다음 내용을 포함한 간결한 심리 분석을 작성해주세요 (300자 이내):
+다음 내용을 포함한 핵심을 제대로 포함한 심리 분석을 작성해주세요 (500자 이내):
 
 1. 전반적인 감정 패턴
 2. 화자 간 관계 특성
 3. 간단한 조언
+
 
 따뜻하고 공감적인 톤으로 작성해주세요."""
         

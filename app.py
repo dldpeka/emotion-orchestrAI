@@ -826,7 +826,8 @@ Aggregator 📊
             
             st.subheader("🔑 추출된 핵심 키워드")
             if keywords:
-                ols = st.columns(3)
+                # 키워드를 컬럼으로 나누어 표시 (가독성 향상)
+                cols = st.columns(3)
                 for idx, kw in enumerate(keywords[:10]):
                     col_idx = idx % 3
                     with cols[col_idx]:
@@ -847,7 +848,7 @@ Aggregator 📊
                         """, unsafe_allow_html=True)
             else:
                 st.info("키워드가 추출되지 않았습니다.")
-                
+            
             st.divider()
             
             content_query = result.get("content_query", "")

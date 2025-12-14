@@ -1,4 +1,119 @@
-import streamlit as st
+# 입력 영역
+    st.header("📝 대화 입력")
+    
+    # 입력 방식 선택
+    input_method = st.radio(
+        "입력 방식 선택",
+        ["📁 CSV 파일 업로드", "✍️ 직접 입력"],
+        horizontal=True
+    )
+    
+    input_text = ""
+    
+    if input_method == "📁 CSV 파일 업로드":
+        st.info("💡 카카오톡 → 대화방 → 설정(≡) → '대화 내보내기' → CSV 파일 저장")
+        
+        uploaded_file = st.file_uploader(
+            "카카오톡 대화 CSV 파일 업로드",
+            type=['csv'],
+            help="Date, User, Message 컬럼이 있는 CSV 파일"
+        )
+        
+        if uploaded_file is not None:
+            try:
+                # CSV 파일 읽기 (인코딩 자동 처리)
+                try:
+                    df = pd.read_csv(uploaded_file, encoding='utf-8')
+                except:
+                    uploaded_file.seek(0)
+                    df = pd.read_csv(uploaded_file, encoding='cp949')
+                
+                st.success(f"✅ CSV 파일 로드 완료: {uploaded_file.name}")
+                
+                # CSV 미리보기
+                with st.expander("📊 CSV 데이터 미리보기"):
+                    st.dataframe(df.head(10), use_container_width=True)
+                    st.caption(f"총 {len(df)}개 행")
+                
+                # 컬럼 확인 (대소문자 무시)
+                df.columns = df.columns.str.lower()
+                
+                if 'date' in df.columns and 'user' in df.columns and 'message' in df.columns:
+                    # CSV를 카카오톡 형식 텍스트로 변환
+                    lines = []
+                    for _, row in df.iterrows():
+                        date = str(row['date']).strip()
+                        user = str(row['user']).strip()
+                        message = str(row['message']).strip()
+                        
+                        # 빈 메시지 제외
+                        if message and message != 'nan':
+                            lines.append(f"{date}, {user} : {message}")
+                    
+                    input_text = '\n'.join(lines)
+                    st.info(f"✅ {len(lines)}개 메시지 변환 완료")
+                else:
+                    st.error(f"❌ CSV 파일에 'date', 'user', 'message' 컬럼이 필요합니다.\n현재 컬럼: {list(df.columns)}")
+                    
+            except Exception as e:
+                st.error(f"❌ 파일 읽기 오류: {e}")
+    
+    else:  # 직접 입력
+        # 샘플 데이터
+        sample_text = """2024년 12월 11일 오후 2:30, 김철수 : 오늘 정말 힘든 하루였어
+2024년 12월 11일 오후 2:31, 이영희 : 무슨 일 있었어?
+2024년 12월 11일 오후 2:32, 김철수 : 회사에서 일이 너무 많아서 스트레스 받아
+2024년 12월 11일 오후 2:33, 이영희 : 힘들겠다 ㅠㅠ 너무 걱정되네
+2024년 12월 11일 오후 2:35, 김철수 : 불안하고 우울해... 어떻게 해야 할지 모르겠어"""
+        
+        col1, col2 = st.columns([3, 1])
+        with col2:
+            if st.button("📋 샘플 데이터", use_container_width=True):
+                st.session_state.input_text = sample_text
+        
+        input_text = st.text_area(
+            "카카오톡 대화 또는 일반 텍스트를 입력하세요",
+            value=st.session_state.get('input_text', ''),
+            height=250,
+            help="카카오톡 형식: YYYY년 MM월 DD일 시간, 이름 : 메시지"
+        )파일을 업로드하세요"
+        )
+        
+        if uploaded_file is not None:
+            file_extension = uploaded_file.name.split('.')[-1].lower()
+            
+            try:
+                if file_extension == 'csv':
+                    # CSV 파일 처리
+                    try:
+                        df = pd.read_csv(uploaded_file, encoding='utf-8')
+                    except:
+                        uploaded_file.seek(0)
+                        df = pd.read_csv(uploaded_file, encoding='cp949')
+                    
+                    st.success(f"✅ CSV 파일 로드 완료: {uploaded_file.name}")
+                    
+                    # CSV 미리보기
+                    with st.expander("📊 CSV 데이터 미리보기"):
+                        st.dataframe(df.head(10), use_container_width=True)
+                        st.caption(f"총 {len(df)}개 행")
+                    
+                    # CSV를 카카오톡 형식 텍스트로 변환
+                    # CSV 컬럼 확인 및 변환
+                    if 'Date' in df.columns and 'User' in df.columns and 'Message' in df.columns:
+                        # 일반적인 CSV 형식
+                        lines = []
+                        for _, row in df.iterrows():
+                            date = row['Date']
+                            user = row['User']
+                            message = row['Message']
+                            lines.append(f"{date}, {user} : {message}")
+                        input_text = '\n'.join(lines)
+                    elif len(df.columns) >= 3:
+                        # 컬럼명이 다른 경우 - 처음 3개 컬럼 사용
+                        st.warning(f"⚠️ 표준 컬럼명이 아닙니다. 첫 3개 컬럼을 (날짜, 사용자, 메시지)로 가정합니다.")
+                        st.info(f"현재 컬럼: {list(df.columns)}")
+                        linesimport streamlit as st
 import pandas as pd
 from typing import TypedDict, List, Dict, Any, Optional
 from typing_extensions import NotRequired
@@ -91,7 +206,12 @@ def init_openai_client(api_key: str):
 def parse_kakao_txt(text: str) -> List[Dict[str, Any]]:
     """카카오톡 텍스트 파싱"""
     messages = []
-    pattern = r'(\d{4}년\s+\d{1,2}월\s+\d{1,2}일.*?),\s*(.+?)\s*:\s*(.+)'
+    
+    # 패턴 1: 2024년 12월 11일 오후 2:30, 이름 : 메시지
+    pattern1 = r'(\d{4}년\s+\d{1,2}월\s+\d{1,2}일.*?),\s*(.+?)\s*:\s*(.+)'
+    
+    # 패턴 2: 2025.6.15  5:48:08 PM, 이름 : 메시지
+    pattern2 = r'(\d{4}\.\d{1,2}\.\d{1,2}\s+\d{1,2}:\d{2}:\d{2}\s+[AP]M),\s*(.+?)\s*:\s*(.+)'
     
     lines = text.strip().split('\n')
     for line in lines:
@@ -99,7 +219,12 @@ def parse_kakao_txt(text: str) -> List[Dict[str, Any]]:
         if not line:
             continue
         
-        match = re.match(pattern, line)
+        # 패턴 1 시도
+        match = re.match(pattern1, line)
+        if not match:
+            # 패턴 2 시도
+            match = re.match(pattern2, line)
+        
         if match:
             datetime_str = match.group(1).strip()
             speaker = match.group(2).strip()

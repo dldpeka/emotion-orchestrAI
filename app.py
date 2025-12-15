@@ -697,8 +697,8 @@ def run_analysis(text: str, openai_key: str, tavily_key: str, classifier):
 # Streamlit UI
 # ============================================================================
 def main():
-    st.title("🎭 감정 분석 멀티에이전트 시스템")
-    st.markdown("### 병렬 실행 아키텍처 + Aggregator")
+    st.title("🎭 감정 분석 다중에이전트 시스템")
+    st.markdown("### 직•병렬 실행 아키텍처 + Aggregator")
     
     # 사이드바
     with st.sidebar:

@@ -94,6 +94,19 @@ def init_openai_client(api_key: str):
         return OpenAI(api_key=api_key)
     return None
 
+
+@st.cache_resource
+def load_keybert_model():
+    """KeyBERT 모델 로딩 - 한국어 BERT 사용"""
+    try:
+        from keybert import KeyBERT
+        # 한국어 BERT 모델 사용
+        kw_model = KeyBERT(model='sentence-transformers/xlm-r-100langs-bert-base-nli-stsb-mean-tokens')
+        return kw_model
+    except Exception as e:
+        st.warning(f"⚠️ KeyBERT 로딩 실패: {e}")
+        return None
+
 # ============================================================================
 # 유틸리티 함수들
 # ============================================================================
@@ -347,17 +360,7 @@ def summary_agent(state: AppState) -> AppState:
     
     return state
 
-@st.cache_resource
-def load_keybert_model():
-    """KeyBERT 모델 로딩 - 한국어 BERT 사용"""
-    try:
-        from keybert import KeyBERT
-        # 한국어 BERT 모델 사용
-        kw_model = KeyBERT(model='sentence-transformers/xlm-r-100langs-bert-base-nli-stsb-mean-tokens')
-        return kw_model
-    except Exception as e:
-        st.warning(f"⚠️ KeyBERT 로딩 실패: {e}")
-        return None
+
 
 def keyword_extractor_agent(state: AppState) -> AppState:
     """키워드 추출 에이전트 (병렬 실행 3) - 개선 버전"""

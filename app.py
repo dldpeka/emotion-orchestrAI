@@ -65,6 +65,7 @@ class AppState(TypedDict, total=False):
     
     # ContentAgent 결과
     content_query: str
+    content_query_display: str 
     content_recos: List[Dict[str, str]]
     
     # Aggregator 최종 결과
@@ -472,51 +473,9 @@ def keyword_extractor_agent(state: AppState) -> AppState:
     
     state["extracted_keywords"] = extracted_keywords
     state["content_query"] = content_query
+    state["content_query_display"] = content_query_display
     state["completed_agents"] = state.get("completed_agents", []) + ["keyword"]
     
-    return state
-
-
-def content_agent(state: AppState, tavily_api_key: str) -> AppState:
-    """콘텐츠 추천 에이전트"""
-    content_query = state.get("content_query", "감정 관리")
-    
-    if not tavily_api_key:
-        state["content_recos"] = []
-        state["completed_agents"] = state.get("completed_agents", []) + ["content"]
-        return state
-    
-    try:
-        client = TavilyClient(api_key=tavily_api_key)
-        response = client.search(
-            query=content_query,
-            search_depth="basic",
-            max_results=5
-        )
-        
-        results = []
-        for item in response.get('results', []):
-            url = item.get('url', '')
-            if 'youtube.com' in url or 'youtu.be' in url:
-                content_type = "video"
-            elif any(domain in url for domain in ['news', 'article', 'blog']):
-                content_type = "article"
-            else:
-                content_type = "content"
-            
-            results.append({
-                "type": content_type,
-                "title": item.get('title', 'No title'),
-                "url": url,
-                "snippet": item.get('content', '')[:150]
-            })
-        
-        state["content_recos"] = results
-    
-    except Exception as e:
-        state["content_recos"] = []
-    
-    state["completed_agents"] = state.get("completed_agents", []) + ["content"]
     return state
 
 def aggregator_agent(state: AppState, openai_client) -> AppState:

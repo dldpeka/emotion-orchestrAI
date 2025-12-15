@@ -441,7 +441,7 @@ def keyword_extractor_agent(state: AppState) -> AppState:
     try:
         keywords_with_scores = kw_model.extract_keywords(
             all_text,
-            keyphrase_ngram_range=(1, 2),
+            keyphrase_ngram_range=(1, 1),
             top_n=15,
             use_mmr=True,
             diversity=0.5
@@ -921,10 +921,11 @@ Aggregator 📊
             
             st.divider()
             
-            content_query = result.get("content_query", "")
-            if content_query:
+            # 🔍 콘텐츠 검색 쿼리 표시 (키워드 구분)
+            content_query_display = result.get("content_query_display", "")
+            if content_query_display:
                 st.subheader("🔍 콘텐츠 검색 쿼리")
-                st.info(f"**{content_query}**")
+                st.info(f"**{content_query_display}**")
                 st.caption("👆 이 키워드로 관련 콘텐츠를 추천합니다")
         
         # 🎬 추천 콘텐츠 탭

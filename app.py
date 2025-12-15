@@ -628,21 +628,33 @@ def main():
         st.divider()
         
         # 모델 로딩
+        # 모델 로딩
         if not st.session_state.models_loaded:
             if st.button("🚀 모델 로딩", use_container_width=True):
                 with st.spinner("모델 로딩 중... (약 1-2분 소요)"):
+                    # 감정 분석 모델
                     st.session_state.emotion_classifier = load_emotion_model()
+                    # KeyBERT 모델
+                    st.session_state.keybert_model = load_keybert_model()
+                    
                     if st.session_state.emotion_classifier:
                         st.session_state.models_loaded = True
                         st.success("✅ 모델 로딩 완료!")
+                        if st.session_state.keybert_model:
+                            st.success("✅ KeyBERT 로딩 완료!")
+                        else:
+                            st.warning("⚠️ KeyBERT 로딩 실패")
                         st.rerun()
                     else:
                         st.error("❌ 모델 로딩 실패")
         else:
             st.success("✅ 모델 로딩됨")
+            if st.session_state.keybert_model:
+                st.success("✅ KeyBERT 활성화")
             if st.button("🔄 모델 재로딩", use_container_width=True):
                 st.session_state.models_loaded = False
                 st.session_state.emotion_classifier = None
+                st.session_state.keybert_model = None
                 st.rerun()
         
         st.divider()

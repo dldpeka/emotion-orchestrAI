@@ -437,26 +437,23 @@ def keyword_extractor_agent(state: AppState) -> AppState:
         state["completed_agents"] = state.get("completed_agents", []) + ["keyword"]
         return state
     
-    # KeyBERT로 키워드 추출
+    # KeyBERT로 키워드 추출 (수 줄임)
     try:
         keywords_with_scores = kw_model.extract_keywords(
             all_text,
-            keyphrase_ngram_range=(1, 1),
-            top_n=15,
+            keyphrase_ngram_range=(1, 1),  # 단일 단어만
+            top_n=30,  # 30개 뽑아서 필터링 (15개 → 30개)
             use_mmr=True,
-            diversity=0.5
+            diversity=0.7  # 다양성 증가 (0.5 → 0.7)
         )
         
-        extracted_keywords = [kw for kw, score in keywords_with_scores]
+        extracted_keywords_raw = [kw for kw, score in keywords_with_scores]
         
     except Exception as e:
         st.error(f"❌ KeyBERT 에러: {str(e)}")
-        extracted_keywords = []
+        extracted_keywords_raw = []
     
-    # 감정별 검색 쿼리 생성 (핵심 명사 키워드 추가)
-    dominant = emotion_summary.get("dominant_label", "중립")
-
-    # 불용어 정의 (의미 없는 단어 - 확장판)
+    # 불용어 정의 (확장판)
     stopwords = {
         # 시간/날짜
         '어제', '오늘', '내일', '모레', '지금', '요즘', '최근', '이번', '다음', '지난',
@@ -480,9 +477,9 @@ def keyword_extractor_agent(state: AppState) -> AppState:
         '것', '거', '게', '때', '수', '등', '들', '중', '간', '만', '도', '까지', '부터',
         '에서', '으로', '로부터', '한테', '더러', '께', '에게', '보고',
         '그런데', '그러나', '하지만', '그래서', '따라서', '그리고', '또', '및', '와', '과',
-        '이나', '나', '든지', '거나',
+        '이나', '든지', '거나',
         
-        # 동사/형용사 어간 (일반적)
+        # 동사/형용사 어간
         '하다', '되다', '이다', '아니다', '있다', '없다', '같다', '다르다', '보다', '듯하다',
         '싶다', '하는', '되는', '이는', '있는', '없는', '같은', '다른',
         
@@ -491,18 +488,42 @@ def keyword_extractor_agent(state: AppState) -> AppState:
         
         # 기타 무의미어
         '거의', '대략', '약', '정도', '쯤', '즈음', '경', '가량', '만큼', '처럼', '듯',
-        '뿐', '밖에', '마저', '조차', '마다', '부터', '까지',
+        '뿐', '밖에', '마저', '조차', '마다',
         '점', '편', '쪽', '면', '측', '차', '채', '대', '장', '권', '건',
         '일', '월', '화', '수', '목', '금', '토', '일요일', '월요일', '화요일', '수요일',
         '원', '달러', '엔', '유로', '파운드'
     }
     
-    # 핵심 명사만 추출 (2단어 이상 구문 제외, 단일 명사만)
-    clean_keywords = [
-        kw for kw in extracted_keywords 
-        if ' ' not in kw and len(kw) >= 2 and kw not in stopwords
-    ][:3]
+    # 조사 붙은 단어 제거 함수
+    def is_pure_noun(word):
+        """조사가 붙지 않은 순수 명사인지 확인"""
+        # 조사 리스트
+        particles = ['은', '는', '이', '가', '을', '를', '의', '에', '도', '만', '부터', '까지', 
+                     '으로', '로', '와', '과', '랑', '이랑', '한테', '께', '에게', '보고']
+        
+        # 단어가 조사로 끝나면 제외
+        for p in particles:
+            if word.endswith(p) and len(word) > len(p):
+                return False
+        return True
+    
+    # 필터링: 불용어 제거 + 조사 붙은 단어 제거 + 길이 2-5자
+    filtered_keywords = [
+        kw for kw in extracted_keywords_raw
+        if (kw not in stopwords and 
+            is_pure_noun(kw) and 
+            2 <= len(kw) <= 5)  # 너무 긴 단어도 제외
+    ]
+    
+    # 상위 6개만 선택 (화면 표시용)
+    extracted_keywords = filtered_keywords[:6]
+    
+    # 검색 쿼리용으로는 상위 3개만
+    clean_keywords = filtered_keywords[:3]
     keywords_str = ' '.join(clean_keywords) if clean_keywords else ""
+    
+    # 감정별 검색 쿼리
+    dominant = emotion_summary.get("dominant_label", "중립")
     
     base_queries = {
         "슬픔": "우울 슬픔 극복 심리 상담",
@@ -519,7 +540,7 @@ def keyword_extractor_agent(state: AppState) -> AppState:
     base_query = base_queries.get(dominant, "감정 관리 심리 건강")
     content_query = f"{base_query} {keywords_str}".strip()
     
-    # 화면 표시용 (키워드 구분)
+    # 화면 표시용
     if clean_keywords:
         content_query_display = f"{base_query} [키워드: {', '.join(clean_keywords)}]"
     else:
